@@ -136,12 +136,27 @@ int main(){
     while (1) {
 
         int n = recvfrom(serverfd, (char*) &request, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
+        if (n < 0)
+            error("ERROR: Reading from socket");
+
+        if (n != sizeof(ntp_packet)) {
+            fprintf(stderr, "Invalid NTP packet size: got %d, expected %lu\n",
+                    n, sizeof(ntp_packet));
+            continue;
+        }
+
+        // 0x1b = 00 011 011 (LI=0, VN=3, Mode=3 for client)
+        if (request.li_vn_mode != 0x1b) {
+            fprintf(stderr, "ERROR: The requested mode is not supported\n");
+            continue;
+        }
+
         // Save receive timestamp
         get_time(&tv, &ntp_seconds, &ntp_fraction);
         response.rxTm_s = htonl(ntp_seconds);
         response.rxTm_f = htonl(ntp_fraction);
-        if ( n < 0 )
-            error("ERROR: Reading from the client's socket");
+
+
 
         // Log about the request
         char client_ip[INET_ADDRSTRLEN];
