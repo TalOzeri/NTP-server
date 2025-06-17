@@ -53,14 +53,14 @@ typedef struct
 int main( int argc, char* argv[ ] ){
     int serverfd; // socket fd
 
-    struct sockaddr_in servaddr, clientaddr;
-    socklen_t addrlen = sizeof(servaddr);
-    bzero(&servaddr, sizeof(servaddr));
+    struct sockaddr_in server_addr, client_addr;
+    socklen_t addrlen = sizeof(server_addr);
+    memset(&server_addr, 0, sizeof(server_addr));
 
     
-    servaddr.sin_family = AF_INET;
-    servaddr.sin_addr.s_addr = INADDR_ANY;
-    servaddr.sin_port = htons(NTP_PORT_NUMBER);
+    server_addr.sin_family = AF_INET;
+    server_addr.sin_addr.s_addr = INADDR_ANY;
+    server_addr.sin_port = htons(NTP_PORT_NUMBER);
 
     // Create a udp socket
     serverfd = socket( AF_INET, SOCK_DGRAM, IPPROTO_UDP );
@@ -68,7 +68,7 @@ int main( int argc, char* argv[ ] ){
         error("Error creating socket");
 
     // Bind the server address to the socket descriptor
-    if (bind(serverfd, (struct sockaddr *)&servaddr, sizeof(servaddr)) < 0)
+    if (bind(serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
         error("Could not bind to address");
 
 }
