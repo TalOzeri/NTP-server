@@ -119,36 +119,38 @@ int main(){
 
     ntp_packet request;
     socklen_t len = sizeof(client_addr);
-    int n = recvfrom(serverfd, (char*) &request, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
-    // Save receive timestamp
-    get_time(&tv, &ntp_seconds, &ntp_fraction);
-    response.rxTm_s = htonl(ntp_seconds);
-    response.rxTm_f = htonl(ntp_fraction);
-    if ( n < 0 ) 
-        error("ERROR: Reading from the client's socket");
+    while (1) {
+
+        int n = recvfrom(serverfd, (char*) &request, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
+        // Save receive timestamp
+        get_time(&tv, &ntp_seconds, &ntp_fraction);
+        response.rxTm_s = htonl(ntp_seconds);
+        response.rxTm_f = htonl(ntp_fraction);
+        if ( n < 0 )
+            error("ERROR: Reading from the client's socket");
 
 
-    // Save the client's transmit time (originate time)
-    response.origTm_s = request.origTm_s;
-    response.origTm_f = request.origTm_f;
+        // Save the client's transmit time (originate time)
+        response.origTm_s = request.origTm_s;
+        response.origTm_f = request.origTm_f;
 
-    // Set Reference timestamp (the time when the server's clock was last updated from a more accurate source).
-    // Since the server is not syncing with an upstream server i will set it as follow:
-    response.refTm_s = response.rxTm_s;
-    response.refTm_f = response.rxTm_f;
-
-
-    // Save Transmit timestamp
-    get_time(&tv, &ntp_seconds, &ntp_fraction);
-    response.txTm_s = htonl(ntp_seconds);
-    response.txTm_f = htonl(ntp_fraction);
+        // Set Reference timestamp (the time when the server's clock was last updated from a more accurate source).
+        // Since the server is not syncing with an upstream server i will set it as follow:
+        response.refTm_s = response.rxTm_s;
+        response.refTm_f = response.rxTm_f;
 
 
-    // Send the packet back to the client
-    n = sendto(serverfd, (char *)&response, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+        // Save Transmit timestamp
+        get_time(&tv, &ntp_seconds, &ntp_fraction);
+        response.txTm_s = htonl(ntp_seconds);
+        response.txTm_f = htonl(ntp_fraction);
 
-    if ( n < 0 )
-        error("ERROR: Sending packet to the client");
-    
+
+        // Send the packet back to the client
+        n = sendto(serverfd, (char *)&response, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+
+        if ( n < 0 )
+            error("ERROR: Sending packet to the client");
+    }
 
 }
