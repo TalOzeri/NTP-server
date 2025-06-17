@@ -9,13 +9,15 @@
 #include <netdb.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
+#include <signal.h> // בשביל signal ו־SIGINT
+
 
 #define NTP_PORT_NUMBER (123)
 #define MAX_CONNECTIONS (3)
 #define NTP_TIMESTAMP_DELTA (2208988800ull)
 #define STRATUM (2)
 
-
+int serverfd = -1; // Global var - for closing the socket from the handler
 
 void error( char* msg )
 {
@@ -23,6 +25,16 @@ void error( char* msg )
 
     exit(EXIT_FAILURE); // Quit the process.
 }
+
+void handle_sigint(int sig) {
+    printf("\n[+] Caught SIGINT. Shutting down server...\n");
+    if (serverfd != -1) {
+        close(serverfd);
+        printf("[+] Socket closed.\n");
+    }
+    exit(0);
+}
+
 
 typedef struct
 {
@@ -88,11 +100,12 @@ void create_base_ntp_response(ntp_packet *response){
 
 int main(){
 
+    signal(SIGINT, handle_sigint);
+
     // Initiate imeval and ntp_seconds / fraction
     struct timeval tv;
     uint32_t ntp_seconds, ntp_fraction;
 
-    int serverfd; // socket fd
 
     struct sockaddr_in server_addr, client_addr;
     // Fill the server_addr with zeros.
@@ -116,6 +129,9 @@ int main(){
 
     ntp_packet request;
     socklen_t len = sizeof(client_addr);
+
+    printf("[+] NTP server is running on port %d. Press Ctrl+C to stop.\n", NTP_PORT_NUMBER);
+
     while (1) {
 
         int n = recvfrom(serverfd, (char*) &request, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
