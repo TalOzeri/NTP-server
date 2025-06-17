@@ -20,6 +20,11 @@
 #define LI_VN_MODE_CLIENT (0x1b)
 #define DEFAULT_POLL_INTERVAL (6)
 #define PRECISION_MS (-6)
+#define MAX_STRATUM (15)
+
+#define LI(request)   (uint8_t) ((request.li_vn_mode & 0xC0) >> 6) // (li   & 11 000 000) >> 6
+#define VN(request)   (uint8_t) ((request.li_vn_mode & 0x38) >> 3) // (vn   & 00 111 000) >> 3
+#define MODE(request) (uint8_t) ((request.li_vn_mode & 0x07) >> 0) // (mode & 00 000 111) >> 0
 
 int serverfd = -1; // Global var - for closing the socket from the handler
 
@@ -132,6 +137,11 @@ int main(){
     if (bind(serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
         error("Could not bind to address");
 
+    // Add sockopt - reuse address
+    int optval = 1;
+    if (setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
+        error("setsockopt failed");
+
     ntp_packet request;
     socklen_t len = sizeof(client_addr);
 
@@ -140,6 +150,7 @@ int main(){
     while (1) {
 
         int n = recvfrom(serverfd, (char*) &request, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
+        // Validations
         if (n < 0)
             error("ERROR: Reading from socket");
 
@@ -149,9 +160,24 @@ int main(){
             continue;
         }
 
-        // 0x1b = 00 011 011 (LI=0, VN=3, Mode=3 for client)
-        if (request.li_vn_mode != LI_VN_MODE_CLIENT) {
-            fprintf(stderr, "ERROR: The requested mode is not supported\n");
+        if (LI(request) == 3) {
+            fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
+            continue;
+        }
+
+        if (VN(request) < 1 || VN(request) > 4) {
+            fprintf(stderr, "Unsupported NTP version %d\n", VN(request));
+            continue;
+        }
+
+        if (MODE(request) != 3) {
+            fprintf(stderr, "Packet mode is not client mode\n");
+            continue;
+        }
+
+
+        if (!(request.stratum <= MAX_STRATUM)) {
+            fprintf(stderr, "ERROR: The stratum in the request is not supported\n");
             continue;
         }
 
