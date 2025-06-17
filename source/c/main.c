@@ -45,7 +45,7 @@ int main()
 
   int portno = 123; // NTP UDP port number.
 
-  char* host_name = "us.pool.ntp.org"; // NTP server host-name.
+  char* host_name = "localhost"; // NTP server host-name.
 
   // Structure that defines the 48 byte NTP packet protocol.
 
