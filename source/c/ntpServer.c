@@ -9,13 +9,12 @@
 #include <netdb.h>
 #include <sys/time.h>
 
-#define NTP_PORT_NUMBER 123
-#define MAX_CONNECTIONS 3
-#define NTP_TIMESTAMP_DELTA 2208988800ull
-#define STRATUM 2
-#define PRECISION -6 // equals 15ms
-#define ROOT_DELAY htonl(1 << 16) // equals 1 second
-#define ROOT_DISPERSION htonl(1 << 16) // equals 1 second
+#define NTP_PORT_NUMBER (123)
+#define MAX_CONNECTIONS (3)
+#define NTP_TIMESTAMP_DELTA (2208988800ull)
+#define STRATUM (2)
+
+
 
 void error( char* msg )
 {
@@ -63,7 +62,29 @@ void get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction)
     *ntp_fraction = (uint32_t)((tv->tv_usec / 1e6) * (1LL << 32));
 }
 
+void create_base_ntp_response(ntp_packet *response){
 
+    // Create and zero out the packet. All 48 bytes worth.
+
+
+    *response = (ntp_packet){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    memset( response, 0, sizeof( ntp_packet ) );
+
+    // Set the first byte's bits to 00,011,100 for li = 0, vn = 3, and mode = 4 (server). The rest will be left set to zero.
+
+    response->li_vn_mode = 0x1c; // Represents 27 in base 10 or 00011100 in base 2.
+
+    response->stratum = STRATUM; // Set stratum.
+
+    response->poll = 6; // 2^6 = 64 seconds (typical value)
+
+    response->precision = -6; // Set precision - equals 15ms.
+
+    response->rootDelay = htonl(1 << 16); // Set root delay - 1 second.
+
+    response->rootDispersion = htonl(1 << 16); // Set root dipsrsion - 1 second.
+}
 
 int main(){
 
@@ -80,22 +101,8 @@ int main(){
     // Create and zero out the packet. All 48 bytes worth.
 
 
-    ntp_packet response = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-
-    memset( &response, 0, sizeof( ntp_packet ) );
-
-    // Set the first byte's bits to 00,011,100 for li = 0, vn = 3, and mode = 4 (server). The rest will be left set to zero.
-
-    response.li_vn_mode = 0x1c; // Represents 27 in base 10 or 00011100 in base 2.
-
-    response.stratum = STRATUM; // Set stratum.
-
-    response.precision = PRECISION; // Set precision.
-
-    response.rootDelay = ROOT_DELAY; // Set root delay.
-
-    response.rootDispersion = ROOT_DISPERSION; // Set root dipsrsion.
-
+    ntp_packet response;
+    create_base_ntp_response(&response);
     
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -124,6 +131,11 @@ int main(){
     // Save the client's transmit time (originate time)
     response.origTm_s = request.origTm_s;
     response.origTm_f = request.origTm_f;
+
+    // Set Reference timestamp (the time when the server's clock was last updated from a more accurate source).
+    // Since the server is not syncing with an upstream server i will set it as follow:
+    response.refTm_s = response.rxTm_s;
+    response.refTm_f = response.rxTm_f;
 
 
     // Save Transmit timestamp
