@@ -21,7 +21,7 @@ void error( char* msg )
 {
     perror( msg ); // Print the error message to stderr.
 
-    exit( 0 ); // Quit the process.
+    exit(EXIT_FAILURE); // Quit the process.
 }
 
 typedef struct
