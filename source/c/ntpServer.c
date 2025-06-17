@@ -60,9 +60,10 @@ int main(){
 
     // Create and zero out the packet. All 48 bytes worth.
 
-    ntp_packet packet = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
-    memset( &packet, 0, sizeof( ntp_packet ) );    
+    ntp_packet response = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    memset( &response, 0, sizeof( ntp_packet ) );
 
     
     server_addr.sin_family = AF_INET;
@@ -78,9 +79,9 @@ int main(){
     if (bind(serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
         error("Could not bind to address");
 
-
+    ntp_packet request;
     socklen_t len = sizeof(client_addr);
-    int n = recvfrom(serverfd, (char*) &packet, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
+    int n = recvfrom(serverfd, (char*) &request, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
     if ( n < 0 ) 
         error("ERROR: Reading from the client's socket");
 
@@ -93,16 +94,13 @@ int main(){
     uint32_t ntp_seconds = tv.tv_sec + NTP_TIMESTAMP_DELTA;
     uint32_t ntp_fraction = (uint32_t)((tv.tv_usec / 1e6) * (1LL << 32));
 
-    packet.txTm_s = htonl(ntp_seconds);
-    packet.txTm_f = htonl(ntp_fraction);
+    response.txTm_s = htonl(ntp_seconds);
+    response.txTm_f = htonl(ntp_fraction);
 
-   
-   // Set the firs Byte's bits to 00,011,100 for li = 0, vn = 3 and mode = 4 (server).
-   *( ( char * ) &packet + 0) = 0x1c; // Represents 28 in base 10 or 00011100 in base 2.
-   
+    
    
     // Send the packet back to the client
-    n = sendto(serverfd, (char *)&packet, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+    n = sendto(serverfd, (char *)&response, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
     if ( n < 0 )
         error("ERROR: Sending packet to the client");
