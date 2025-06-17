@@ -39,7 +39,7 @@ void error( char* msg )
     exit( 0 ); // Quit the process.
 }
 
-int main( int argc, char* argv[ ] )
+int main()
 {
   int sockfd, n; // Socket file descriptor and the n return result from writing/reading from the socket.
 

@@ -50,7 +50,7 @@ typedef struct
 } ntp_packet;              // Total: 384 bits or 48 bytes.
 
 
-int main( int argc, char* argv[ ] ){
+int main(){
     int serverfd; // socket fd
 
     struct sockaddr_in server_addr, client_addr;
@@ -78,7 +78,7 @@ int main( int argc, char* argv[ ] ){
     if (bind(serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
         error("Could not bind to address");
 
-    // Receive ntp request from the client
+
     socklen_t len = sizeof(client_addr);
     int n = recvfrom(serverfd, (char*) &packet, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
     if ( n < 0 ) 
