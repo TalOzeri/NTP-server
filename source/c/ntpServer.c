@@ -68,7 +68,6 @@ void create_base_ntp_response(ntp_packet *response){
     // Create and zero out the packet. All 48 bytes worth.
 
 
-    *response = (ntp_packet){ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     memset( response, 0, sizeof( ntp_packet ) );
 
