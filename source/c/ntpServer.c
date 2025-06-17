@@ -9,13 +9,17 @@
 #include <netdb.h>
 #include <sys/time.h>
 #include <arpa/inet.h>
-#include <signal.h> // בשביל signal ו־SIGINT
+#include <signal.h>
 
 
 #define NTP_PORT_NUMBER (123)
 #define MAX_CONNECTIONS (3)
 #define NTP_TIMESTAMP_DELTA (2208988800ull)
 #define STRATUM (2)
+#define LI_VN_MODE_SERVER (0x1c)
+#define LI_VN_MODE_CLIENT (0x1b)
+#define DEFAULT_POLL_INTERVAL (6)
+#define PRECISION_MS (-6)
 
 int serverfd = -1; // Global var - for closing the socket from the handler
 
@@ -86,13 +90,13 @@ void create_base_ntp_response(ntp_packet *response){
 
     // Set the first byte's bits to 00,011,100 for li = 0, vn = 3, and mode = 4 (server). The rest will be left set to zero.
 
-    response->li_vn_mode = 0x1c; // Represents 27 in base 10 or 00011100 in base 2.
+    response->li_vn_mode = LI_VN_MODE_SERVER; // Represents 27 in base 10 or 00011100 in base 2.
 
     response->stratum = STRATUM; // Set stratum.
 
-    response->poll = 6; // 2^6 = 64 seconds (typical value)
+    response->poll = DEFAULT_POLL_INTERVAL; // 2^6 = 64 seconds (typical value)
 
-    response->precision = -6; // Set precision - equals 15ms.
+    response->precision = PRECISION_MS; // Set precision - -6 equals 15ms.
 
     response->rootDelay = htonl(1 << 16); // Set root delay - 1 second.
 
@@ -146,7 +150,7 @@ int main(){
         }
 
         // 0x1b = 00 011 011 (LI=0, VN=3, Mode=3 for client)
-        if (request.li_vn_mode != 0x1b) {
+        if (request.li_vn_mode != LI_VN_MODE_CLIENT) {
             fprintf(stderr, "ERROR: The requested mode is not supported\n");
             continue;
         }
