@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <sys/time.h>
+#include <arpa/inet.h>
 
 #define NTP_PORT_NUMBER (123)
 #define MAX_CONNECTIONS (3)
@@ -125,6 +126,12 @@ int main(){
         response.rxTm_f = htonl(ntp_fraction);
         if ( n < 0 )
             error("ERROR: Reading from the client's socket");
+
+        // Log about the request
+        char client_ip[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
+        printf("Request from %s\n", client_ip);
+
 
 
         // Save the client's transmit time (originate time)
