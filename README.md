@@ -1,3 +1,36 @@
+# Simple NTP Server and Client
+
+This project provides a basic implementation of the Network Time Protocol (NTP) server and client in C.
+
+> ⚠️ The NTP server does **not** synchronize with any upstream time source. It uses the local system time only.
+
+## Building
+
+From the `/source/c` directory, run:
+
+```bash
+make
+```
+
+## Running
+
+
+To run the server:
+
+```bash
+./ntpServer
+```
+To run the client:
+
+```bash
+./ntpClient
+```
+
+![Alt text](Screenshot1.png)
+
+
+### Old readme:
+
 ![Alt text](screenshot.jpg)
 
 # NTP Client
