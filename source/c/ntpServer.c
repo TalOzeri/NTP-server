@@ -55,7 +55,14 @@ int main( int argc, char* argv[ ] ){
 
     struct sockaddr_in server_addr, client_addr;
     socklen_t addrlen = sizeof(server_addr);
+    // Fill the server_addr with zeros.
     memset(&server_addr, 0, sizeof(server_addr));
+
+    // Create and zero out the packet. All 48 bytes worth.
+
+    ntp_packet packet = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+    memset( &packet, 0, sizeof( ntp_packet ) );    
 
     
     server_addr.sin_family = AF_INET;
@@ -70,5 +77,12 @@ int main( int argc, char* argv[ ] ){
     // Bind the server address to the socket descriptor
     if (bind(serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
         error("Could not bind to address");
+
+    // Receive ntp request from the client
+    socklen_t len = sizeof(client_addr);
+    int n = recvfrom(serverfd, (char*) &packet, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
+    if ( n < 0 ) 
+        error("ERROR: Reading from the client's socket");
+    
 
 }
