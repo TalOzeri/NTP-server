@@ -54,7 +54,6 @@ int main(){
     int serverfd; // socket fd
 
     struct sockaddr_in server_addr, client_addr;
-    socklen_t addrlen = sizeof(server_addr);
     // Fill the server_addr with zeros.
     memset(&server_addr, 0, sizeof(server_addr));
 
