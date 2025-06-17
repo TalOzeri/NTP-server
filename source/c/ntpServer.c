@@ -12,6 +12,10 @@
 #define NTP_PORT_NUMBER 123
 #define MAX_CONNECTIONS 3
 #define NTP_TIMESTAMP_DELTA 2208988800ull
+#define STRATUM 2
+#define PRECISION -6 // equals 15ms
+#define ROOT_DELAY htonl(1 << 16) // equals 1 second
+#define ROOT_DISPERSION htonl(1 << 16) // equals 1 second
 
 void error( char* msg )
 {
@@ -50,8 +54,23 @@ typedef struct
 
 } ntp_packet;              // Total: 384 bits or 48 bytes.
 
+void get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction){
+    // Get the time
+    gettimeofday(tv, NULL);
+
+    // Convert the time to NTP format
+    *ntp_seconds = tv->tv_sec + NTP_TIMESTAMP_DELTA;
+    *ntp_fraction = (uint32_t)((tv->tv_usec / 1e6) * (1LL << 32));
+}
+
+
 
 int main(){
+
+    // Initiate imeval and ntp_seconds / fraction
+    struct timeval tv;
+    uint32_t ntp_seconds, ntp_fraction;
+
     int serverfd; // socket fd
 
     struct sockaddr_in server_addr, client_addr;
@@ -64,6 +83,18 @@ int main(){
     ntp_packet response = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     memset( &response, 0, sizeof( ntp_packet ) );
+
+    // Set the first byte's bits to 00,011,100 for li = 0, vn = 3, and mode = 4 (server). The rest will be left set to zero.
+
+    response.li_vn_mode = 0x1c; // Represents 27 in base 10 or 00011100 in base 2.
+
+    response.stratum = STRATUM; // Set stratum.
+
+    response.precision = PRECISION; // Set precision.
+
+    response.rootDelay = ROOT_DELAY; // Set root delay.
+
+    response.rootDispersion = ROOT_DISPERSION; // Set root dipsrsion.
 
     
     server_addr.sin_family = AF_INET;
@@ -82,23 +113,25 @@ int main(){
     ntp_packet request;
     socklen_t len = sizeof(client_addr);
     int n = recvfrom(serverfd, (char*) &request, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
+    // Save receive timestamp
+    get_time(&tv, &ntp_seconds, &ntp_fraction);
+    response.rxTm_s = htonl(ntp_seconds);
+    response.rxTm_f = htonl(ntp_fraction);
     if ( n < 0 ) 
         error("ERROR: Reading from the client's socket");
 
-    
-    // Get the time
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
 
-    // Convert the time to NTP format
-    uint32_t ntp_seconds = tv.tv_sec + NTP_TIMESTAMP_DELTA;
-    uint32_t ntp_fraction = (uint32_t)((tv.tv_usec / 1e6) * (1LL << 32));
+    // Save the client's transmit time (originate time)
+    response.origTm_s = request.origTm_s;
+    response.origTm_f = request.origTm_f;
 
+
+    // Save Transmit timestamp
+    get_time(&tv, &ntp_seconds, &ntp_fraction);
     response.txTm_s = htonl(ntp_seconds);
     response.txTm_f = htonl(ntp_fraction);
 
-    
-   
+
     // Send the packet back to the client
     n = sendto(serverfd, (char *)&response, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
