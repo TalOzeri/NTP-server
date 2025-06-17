@@ -7,10 +7,11 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
-
+#include <sys/time.h>
 
 #define NTP_PORT_NUMBER 123
 #define MAX_CONNECTIONS 3
+#define NTP_TIMESTAMP_DELTA 2208988800ull
 
 void error( char* msg )
 {
@@ -82,6 +83,24 @@ int main(){
     int n = recvfrom(serverfd, (char*) &packet, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, &len);
     if ( n < 0 ) 
         error("ERROR: Reading from the client's socket");
+
+    
+    // Get the time
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+
+    // Convert the time to NTP format
+    uint32_t ntp_seconds = tv.tv_sec + NTP_TIMESTAMP_DELTA;
+    uint32_t ntp_fraction = (uint32_t)((tv.tv_usec / 1e6) * (1LL << 32));
+
+    packet.txTm_s = htonl(ntp_seconds);
+    packet.txTm_f = htonl(ntp_fraction);
+
+    // Send the packet back to the client
+    n = sendto(serverfd, (char *)&packet, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
+
+    if ( n < 0 )
+        error("ERROR: Sending packet to the client");
     
 
 }
