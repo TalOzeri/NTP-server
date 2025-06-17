@@ -27,6 +27,7 @@ void error( char* msg )
 }
 
 void handle_sigint(int sig) {
+    (void)sig; // No need for this sig - this is the convention for the sig handlers.
     printf("\n[+] Caught SIGINT. Shutting down server...\n");
     if (serverfd != -1) {
         close(serverfd);
