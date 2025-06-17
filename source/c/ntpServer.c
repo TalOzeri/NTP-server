@@ -98,9 +98,6 @@ int main(){
     // Fill the server_addr with zeros.
     memset(&server_addr, 0, sizeof(server_addr));
 
-    // Create and zero out the packet. All 48 bytes worth.
-
-
     ntp_packet response;
     create_base_ntp_response(&response);
     
