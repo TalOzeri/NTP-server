@@ -96,6 +96,11 @@ int main(){
     packet.txTm_s = htonl(ntp_seconds);
     packet.txTm_f = htonl(ntp_fraction);
 
+   
+   // Set the firs Byte's bits to 00,011,100 for li = 0, vn = 3 and mode = 4 (server).
+   *( ( char * ) &packet + 0) = 0x1c; // Represents 28 in base 10 or 00011100 in base 2.
+   
+   
     // Send the packet back to the client
     n = sendto(serverfd, (char *)&packet, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
 
