@@ -22,9 +22,9 @@
 #define PRECISION_MS (-6)
 #define MAX_STRATUM (15)
 
-#define LI(request)   (uint8_t) ((request.li_vn_mode & 0xC0) >> 6) // (li   & 11 000 000) >> 6
-#define VN(request)   (uint8_t) ((request.li_vn_mode & 0x38) >> 3) // (vn   & 00 111 000) >> 3
-#define MODE(request) (uint8_t) ((request.li_vn_mode & 0x07) >> 0) // (mode & 00 000 111) >> 0
+#define LI(request)   (uint8_t) ((request->li_vn_mode & 0xC0) >> 6) // (li   & 11 000 000) >> 6
+#define VN(request)   (uint8_t) ((request->li_vn_mode & 0x38) >> 3) // (vn   & 00 111 000) >> 3
+#define MODE(request) (uint8_t) ((request->li_vn_mode & 0x07) >> 0) // (mode & 00 000 111) >> 0
 
 int serverfd = -1; // Global var - for closing the socket from the handler
 
@@ -105,17 +105,80 @@ void create_base_ntp_response(ntp_packet *response){
 
     response->rootDelay = htonl(1 << 16); // Set root delay - 1 second.
 
-    response->rootDispersion = htonl(1 << 16); // Set root dipsrsion - 1 second.
+    response->rootDispersion = htonl(1 << 16); // Set root dispersion - 1 second.
 }
 
-int main(){
+// return 1 if we should skip (invalid / already handled), 0 if OK to send response
+int handle_request(ntp_packet *response, ntp_packet *request, struct sockaddr_in *client_addr) {
+    if (LI(request) == 3) {
+        fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
+        return 1;
+    }
 
-    signal(SIGINT, handle_sigint);
+    if (VN(request) < 1 || VN(request) > 4) {
+        fprintf(stderr, "Unsupported NTP version %d\n", VN(request));
+        return 1;
+    }
+
+    if (MODE(request) != 3) {
+        fprintf(stderr, "Packet mode is not client mode\n");
+        return 1;
+    }
+
+
+    if (!(request->stratum <= MAX_STRATUM)) {
+        fprintf(stderr, "ERROR: The stratum in the request is not supported\n");
+        return 1;
+    }
 
     // Initiate imeval and ntp_seconds / fraction
     struct timeval tv;
     uint32_t ntp_seconds, ntp_fraction;
 
+    // Save receive timestamp
+    get_time(&tv, &ntp_seconds, &ntp_fraction);
+    response->rxTm_s = htonl(ntp_seconds);
+    response->rxTm_f = htonl(ntp_fraction);
+
+
+
+    // Log about the request
+    char client_ip[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &(client_addr->sin_addr), client_ip, INET_ADDRSTRLEN);
+    printf("Request from %s\n", client_ip);
+
+
+
+    // Save the client's transmit time (originate time)
+    response->origTm_s = request->origTm_s;
+    response->origTm_f = request->origTm_f;
+
+    // Set Reference timestamp (the time when the server's clock was last updated from a more accurate source).
+    // Since the server is not syncing with an upstream server i will set it as follow:
+    response->refTm_s = response->rxTm_s;
+    response->refTm_f = response->rxTm_f;
+
+
+    // Save Transmit timestamp
+    get_time(&tv, &ntp_seconds, &ntp_fraction);
+    response->txTm_s = htonl(ntp_seconds);
+    response->txTm_f = htonl(ntp_fraction);
+
+
+    // Send the packet back to the client
+    int n = sendto(serverfd, (char *)response, sizeof(ntp_packet), 0, (struct sockaddr*)client_addr, sizeof(*client_addr));
+
+    if ( n < 0 ){
+        fprintf(stderr, "ERROR: Sending packet to the client\n");
+        return 1;
+    }
+
+    return 0;
+}
+
+int main(){
+
+    signal(SIGINT, handle_sigint);
 
     struct sockaddr_in server_addr, client_addr;
     // Fill the server_addr with zeros.
@@ -160,62 +223,10 @@ int main(){
             continue;
         }
 
-        if (LI(request) == 3) {
-            fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
+        // Send the packet to the handler - if 1 is returned than coninute (Caused by validation)
+        if (handle_request(&response, &request, &client_addr))
             continue;
-        }
 
-        if (VN(request) < 1 || VN(request) > 4) {
-            fprintf(stderr, "Unsupported NTP version %d\n", VN(request));
-            continue;
-        }
-
-        if (MODE(request) != 3) {
-            fprintf(stderr, "Packet mode is not client mode\n");
-            continue;
-        }
-
-
-        if (!(request.stratum <= MAX_STRATUM)) {
-            fprintf(stderr, "ERROR: The stratum in the request is not supported\n");
-            continue;
-        }
-
-        // Save receive timestamp
-        get_time(&tv, &ntp_seconds, &ntp_fraction);
-        response.rxTm_s = htonl(ntp_seconds);
-        response.rxTm_f = htonl(ntp_fraction);
-
-
-
-        // Log about the request
-        char client_ip[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &(client_addr.sin_addr), client_ip, INET_ADDRSTRLEN);
-        printf("Request from %s\n", client_ip);
-
-
-
-        // Save the client's transmit time (originate time)
-        response.origTm_s = request.origTm_s;
-        response.origTm_f = request.origTm_f;
-
-        // Set Reference timestamp (the time when the server's clock was last updated from a more accurate source).
-        // Since the server is not syncing with an upstream server i will set it as follow:
-        response.refTm_s = response.rxTm_s;
-        response.refTm_f = response.rxTm_f;
-
-
-        // Save Transmit timestamp
-        get_time(&tv, &ntp_seconds, &ntp_fraction);
-        response.txTm_s = htonl(ntp_seconds);
-        response.txTm_f = htonl(ntp_fraction);
-
-
-        // Send the packet back to the client
-        n = sendto(serverfd, (char *)&response, sizeof(ntp_packet), 0, (struct sockaddr*)&client_addr, sizeof(client_addr));
-
-        if ( n < 0 )
-            error("ERROR: Sending packet to the client");
     }
 
 }
