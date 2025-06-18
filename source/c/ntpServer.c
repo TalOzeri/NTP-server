@@ -190,4 +190,6 @@ int main() {
         if (handle_request(&response, &request, &client_addr))
             continue;
     }
+    
+    return 0;
 }
