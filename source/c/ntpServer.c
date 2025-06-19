@@ -46,6 +46,17 @@
 
 static int g_serverfd = -1; // Global socket descriptor, closed by handler
 
+/**
+ * @brief Prints an error message and terminates the program.
+ *
+ * Calls perror(msg) to display a system error message,
+ * then exits the program with EXIT_FAILURE.
+ * Validates that the message pointer is not NULL.
+ *
+ * @param msg A string describing the error context.
+ *
+ * @note This function does not return.
+ */
 void error(char *msg) {
     CHECK_NULL(msg);
     perror(msg);
