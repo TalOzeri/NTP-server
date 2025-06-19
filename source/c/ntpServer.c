@@ -10,6 +10,25 @@
 #include <sys/time.h>
 #include <arpa/inet.h>
 #include <signal.h>
+#include <stdbool.h>
+
+/*
+ * CHECK_NULL(ptr)
+ * ----------------
+ * Terminates the program if 'ptr' is NULL.
+ * Prints an error message with the pointer name.
+ *
+ * Usage: CHECK_NULL(my_ptr);
+ *
+ * Note: Use only when NULL is fatal. Acts as a single statement.
+ */
+#define CHECK_NULL(ptr)                             \
+    do {                                             \
+        if ((ptr) == NULL) {                         \
+            fprintf(stderr, "Pointer %s is NULL\n", #ptr); \
+            exit(EXIT_FAILURE);                      \
+        }                                            \
+    } while (false)
 
 #define NTP_PORT_NUMBER        (123)
 #define MAX_CONNECTIONS        (3)
@@ -28,6 +47,7 @@
 int serverfd = -1; // Global var - for closing the socket from the handler
 
 void error(char *msg) {
+    CHECK_NULL(msg);
     perror(msg);
     exit(EXIT_FAILURE);
 }
@@ -66,12 +86,20 @@ typedef struct {
 } ntp_packet; // Total: 384 bits (48 bytes)
 
 void get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction) {
+
+    CHECK_NULL(tv);
+    CHECK_NULL(ntp_seconds);
+    CHECK_NULL(ntp_fraction);
+
     gettimeofday(tv, NULL);
     *ntp_seconds = tv->tv_sec + NTP_TIMESTAMP_DELTA;
     *ntp_fraction = (uint32_t)((tv->tv_usec / 1e6) * (1LL << 32));
 }
 
 void create_base_ntp_response(ntp_packet *response) {
+
+    CHECK_NULL(response);
+
     memset(response, 0, sizeof(ntp_packet));
 
     response->li_vn_mode     = LI_VN_MODE_SERVER;
@@ -84,6 +112,11 @@ void create_base_ntp_response(ntp_packet *response) {
 
 // Return 1 if packet should be ignored, 0 if response should be sent
 int handle_request(ntp_packet *response, ntp_packet *request, struct sockaddr_in *client_addr) {
+
+    CHECK_NULL(response);
+    CHECK_NULL(request);
+    CHECK_NULL(client_addr);
+
     if (LI(request) == 3) {
         fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
         return 1;
