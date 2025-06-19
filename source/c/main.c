@@ -28,9 +28,8 @@
 
 #define NTP_TIMESTAMP_DELTA 2208988800ull
 
-#define LI(packet)   (uint8_t) ((packet.li_vn_mode & 0xC0) >> 6) // (li   & 11 000 000) >> 6
-#define VN(packet)   (uint8_t) ((packet.li_vn_mode & 0x38) >> 3) // (vn   & 00 111 000) >> 3
-#define MODE(packet) (uint8_t) ((packet.li_vn_mode & 0x07) >> 0) // (mode & 00 000 111) >> 0
+
+#define LI_VN_MODE_CLIENT      (0x1b)
 
 
 const char* HOST_NAME = "localhost"; // NTP server host-name.
@@ -51,45 +50,66 @@ int main()
 
   // Structure that defines the 48 byte NTP packet protocol.
 
-  typedef struct
-  {
+  // Union representing the first byte of an NTP packet (LI | VN | Mode).
+  // This allows safe access to the flags both as a full byte and as individual bitfields.
+  // The NTP specification defines the first byte as:
+  // Bits 0-1: Leap Indicator (LI)
+  // Bits 2-4: Version Number (VN)
+  // Bits 5-7: Mode
+  // However, C does not define bitfield ordering, so we check system endianness.
+  typedef union {
+      struct {
+  #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+          uint8_t mode : 3;             // Bits 0-2: Mode (e.g., client = 3, server = 4)
+          uint8_t version_number : 3;   // Bits 3-5: NTP version (3 or 4 are common)
+          uint8_t leap_indicator : 2;   // Bits 6-7: Leap Indicator (0 = no warning, 3 = unsynced)
+  #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+          uint8_t leap_indicator : 2;   // Bits 0-1 (most significant)
+          uint8_t version_number : 3;   // Bits 2-4
+          uint8_t mode : 3;             // Bits 5-7 (least significant)
+  #else
+  #   error "Unknown byte order. Cannot safely define bitfields."
+  #endif
+      } bits;
 
-    uint8_t li_vn_mode;      // Eight bits. li, vn, and mode.
-                             // li.   Two bits.   Leap indicator.
-                             // vn.   Three bits. Version number of the protocol.
-                             // mode. Three bits. Client will pick mode 3 for client.
+      uint8_t raw; // Raw access to the full byte (for sending/receiving over network)
+  } ntp_flags_t;
 
-    uint8_t stratum;         // Eight bits. Stratum level of the local clock.
-    uint8_t poll;            // Eight bits. Maximum interval between successive messages.
-    uint8_t precision;       // Eight bits. Precision of the local clock.
 
-    uint32_t rootDelay;      // 32 bits. Total round trip delay time.
-    uint32_t rootDispersion; // 32 bits. Max error aloud from primary clock source.
-    uint32_t refId;          // 32 bits. Reference clock identifier.
+  // Full NTP packet structure (48 bytes total).
+  // This layout matches the standard NTPv3/4 packet format used in the protocol.
+  typedef struct ntp_packet_t {
+      ntp_flags_t flags;        // First byte: Leap, Version, Mode
+      uint8_t  stratum;         // Stratum level
+      uint8_t  poll;            // Max interval between messages
+      uint8_t  precision;       // Clock precision
 
-    uint32_t refTm_s;        // 32 bits. Reference time-stamp seconds.
-    uint32_t refTm_f;        // 32 bits. Reference time-stamp fraction of a second.
+      uint32_t rootDelay;       // Total round trip delay time
+      uint32_t rootDispersion;  // Max error from primary source
+      uint32_t refId;           // Reference clock ID
 
-    uint32_t origTm_s;       // 32 bits. Originate time-stamp seconds.
-    uint32_t origTm_f;       // 32 bits. Originate time-stamp fraction of a second.
+      uint32_t refTm_s;         // Reference timestamp (seconds)
+      uint32_t refTm_f;         // Reference timestamp (fraction)
 
-    uint32_t rxTm_s;         // 32 bits. Received time-stamp seconds.
-    uint32_t rxTm_f;         // 32 bits. Received time-stamp fraction of a second.
+      uint32_t origTm_s;        // Originate timestamp (seconds)
+      uint32_t origTm_f;        // Originate timestamp (fraction)
 
-    uint32_t txTm_s;         // 32 bits and the most important field the client cares about. Transmit time-stamp seconds.
-    uint32_t txTm_f;         // 32 bits. Transmit time-stamp fraction of a second.
+      uint32_t rxTm_s;          // Receive timestamp (seconds)
+      uint32_t rxTm_f;          // Receive timestamp (fraction)
 
-  } ntp_packet;              // Total: 384 bits or 48 bytes.
+      uint32_t txTm_s;          // Transmit timestamp (seconds)
+      uint32_t txTm_f;          // Transmit timestamp (fraction)
+  } ntp_packet_t; // Total: 384 bits (48 bytes)
 
   // Create and zero out the packet. All 48 bytes worth.
 
-  ntp_packet packet = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+  ntp_packet_t packet;
 
-  memset( &packet, 0, sizeof( ntp_packet ) );
+  memset( &packet, 0, sizeof( ntp_packet_t ) );
 
   // Set the first byte's bits to 00,011,011 for li = 0, vn = 3, and mode = 3. The rest will be left set to zero.
 
-  *( ( char * ) &packet + 0 ) = 0x1b; // Represents 27 in base 10 or 00011011 in base 2.
+  packet.flags.raw = LI_VN_MODE_CLIENT; // Represents 27 in base 10 or 00011011 in base 2.
 
   // Create a UDP socket, convert the host-name to an IP address, set the port number,
   // connect to the server, send the packet, and then read in the return packet.
@@ -128,14 +148,14 @@ int main()
 
   // Send it the NTP packet it wants. If n == -1, it failed.
 
-  n = write( sockfd, ( char* ) &packet, sizeof( ntp_packet ) );
+  n = write( sockfd, ( char* ) &packet, sizeof( ntp_packet_t ) );
 
   if ( n < 0 )
     error( "ERROR writing to socket" );
 
   // Wait and receive the packet back from the server. If n == -1, it failed.
 
-  n = read( sockfd, ( char* ) &packet, sizeof( ntp_packet ) );
+  n = read( sockfd, ( char* ) &packet, sizeof( ntp_packet_t ) );
 
   if ( n < 0 )
     error( "ERROR reading from socket" );

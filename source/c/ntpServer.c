@@ -43,9 +43,7 @@
 #define PRECISION_MS           (-6)
 #define MAX_STRATUM            (15)
 
-#define LI(request)    ((uint8_t)((request->li_vn_mode & 0xC0) >> 6)) // Leap Indicator (2 bits)
-#define VN(request)    ((uint8_t)((request->li_vn_mode & 0x38) >> 3)) // Version Number (3 bits)
-#define MODE(request)  ((uint8_t)((request->li_vn_mode & 0x07) >> 0)) // Mode (3 bits)
+
 
 #define CLOSED_SOCKET    (-1)
 
@@ -80,8 +78,36 @@ void handle_sigint(int sig) {
     exit(0);
 }
 
+// Union representing the first byte of an NTP packet (LI | VN | Mode).
+// This allows safe access to the flags both as a full byte and as individual bitfields.
+// The NTP specification defines the first byte as:
+// Bits 0-1: Leap Indicator (LI)
+// Bits 2-4: Version Number (VN)
+// Bits 5-7: Mode
+// However, C does not define bitfield ordering, so we check system endianness.
+typedef union {
+    struct {
+#if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
+        uint8_t mode : 3;             // Bits 0-2: Mode (e.g., client = 3, server = 4)
+        uint8_t version_number : 3;   // Bits 3-5: NTP version (3 or 4 are common)
+        uint8_t leap_indicator : 2;   // Bits 6-7: Leap Indicator (0 = no warning, 3 = unsynced)
+#elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        uint8_t leap_indicator : 2;   // Bits 0-1 (most significant)
+        uint8_t version_number : 3;   // Bits 2-4
+        uint8_t mode : 3;             // Bits 5-7 (least significant)
+#else
+#   error "Unknown byte order. Cannot safely define bitfields."
+#endif
+    } bits;
+
+    uint8_t raw; // Raw access to the full byte (for sending/receiving over network)
+} ntp_flags_t;
+
+
+// Full NTP packet structure (48 bytes total).
+// This layout matches the standard NTPv3/4 packet format used in the protocol.
 typedef struct ntp_packet_t {
-    uint8_t  li_vn_mode;      // Leap Indicator (2 bits), Version (3 bits), Mode (3 bits)
+    ntp_flags_t flags;        // First byte: Leap, Version, Mode
     uint8_t  stratum;         // Stratum level
     uint8_t  poll;            // Max interval between messages
     uint8_t  precision;       // Clock precision
@@ -120,7 +146,7 @@ void create_base_ntp_response(ntp_packet_t *response) {
 
     memset(response, 0, sizeof(ntp_packet_t));
 
-    response->li_vn_mode     = LI_VN_MODE_SERVER;
+    response->flags.raw = LI_VN_MODE_SERVER;
     response->stratum        = STRATUM;
     response->poll           = DEFAULT_POLL_INTERVAL;
     response->precision      = PRECISION_MS;
@@ -135,17 +161,22 @@ int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockadd
     CHECK_NULL(request);
     CHECK_NULL(client_addr);
 
-    if (LI(request) == 3) {
+    ntp_flags_t flags;
+    memset(&flags, 0, sizeof(ntp_flags_t));
+    memcpy(&flags, &request->flags, sizeof(ntp_flags_t));
+
+
+    if (flags.bits.leap_indicator == 3) {
         fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
         return 1;
     }
 
-    if (VN(request) < 1 || VN(request) > 4) {
-        fprintf(stderr, "Unsupported NTP version %d\n", VN(request));
+    if (flags.bits.version_number < 1 || flags.bits.version_number > 4) {
+        fprintf(stderr, "Unsupported NTP version %d\n", flags.bits.version_number);
         return 1;
     }
 
-    if (MODE(request) != 3) {
+    if (flags.bits.mode != 3) {
         fprintf(stderr, "Packet mode is not client mode\n");
         return 1;
     }
