@@ -44,7 +44,7 @@
 #define VN(request)    ((uint8_t)((request->li_vn_mode & 0x38) >> 3)) // Version Number (3 bits)
 #define MODE(request)  ((uint8_t)((request->li_vn_mode & 0x07) >> 0)) // Mode (3 bits)
 
-int serverfd = -1; // Global var - for closing the socket from the handler
+static int g_serverfd = -1; // Global socket descriptor, closed by handler
 
 void error(char *msg) {
     CHECK_NULL(msg);
@@ -55,8 +55,8 @@ void error(char *msg) {
 void handle_sigint(int sig) {
     (void)sig;
     printf("\n[+] Caught SIGINT. Shutting down server...\n");
-    if (serverfd != -1) {
-        close(serverfd);
+    if (g_serverfd != -1) {
+        close(g_serverfd);
         printf("[+] Socket closed.\n");
     }
     exit(0);
@@ -164,7 +164,7 @@ int handle_request(ntp_packet *response, ntp_packet *request, struct sockaddr_in
     response->txTm_f = htonl(ntp_fraction);
 
     // Send response
-    int n = sendto(serverfd, (char *)response, sizeof(ntp_packet), 0,
+    int n = sendto(g_serverfd, (char *)response, sizeof(ntp_packet), 0,
                    (struct sockaddr *)client_addr, sizeof(*client_addr));
 
     if (n < 0) {
@@ -189,17 +189,17 @@ int main() {
     server_addr.sin_port = htons(NTP_PORT_NUMBER);
 
     // Create UDP socket
-    serverfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (serverfd < 0)
+    g_serverfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
+    if (g_serverfd < 0)
         error("Error creating socket");
 
     // Bind address to socket
-    if (bind(serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    if (bind(g_serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
         error("Could not bind to address");
 
     // Reuse address
     int optval = 1;
-    if (setsockopt(serverfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
+    if (setsockopt(g_serverfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
         error("setsockopt failed");
 
     ntp_packet request;
@@ -208,7 +208,7 @@ int main() {
     printf("[+] NTP server is running on port %d. Press Ctrl+C to stop.\n", NTP_PORT_NUMBER);
 
     while (1) {
-        int n = recvfrom(serverfd, (char *)&request, sizeof(ntp_packet), 0,
+        int n = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet), 0,
                          (struct sockaddr *)&client_addr, &len);
 
         if (n < 0)
