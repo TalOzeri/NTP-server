@@ -47,7 +47,9 @@
 #define VN(request)    ((uint8_t)((request->li_vn_mode & 0x38) >> 3)) // Version Number (3 bits)
 #define MODE(request)  ((uint8_t)((request->li_vn_mode & 0x07) >> 0)) // Mode (3 bits)
 
-static int g_serverfd = -1; // Global socket descriptor, closed by handler
+#define CLOSED_SOCKET    (-1)
+
+static int g_serverfd = CLOSED_SOCKET; // Global socket descriptor, closed by handler
 
 /**
  * @brief Prints an error message and terminates the program.
@@ -69,8 +71,9 @@ void error(char *msg) {
 void handle_sigint(int sig) {
     IGNORE_UNUSED_VARIABLES(sig);
     printf("\n[+] Caught SIGINT. Shutting down server...\n");
-    if (g_serverfd != -1) {
+    if (g_serverfd != CLOSED_SOCKET) {
         close(g_serverfd);
+        g_serverfd = CLOSED_SOCKET;
         printf("[+] Socket closed.\n");
     }
     exit(0);
