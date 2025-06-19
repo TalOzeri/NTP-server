@@ -32,6 +32,9 @@
 #define VN(packet)   (uint8_t) ((packet.li_vn_mode & 0x38) >> 3) // (vn   & 00 111 000) >> 3
 #define MODE(packet) (uint8_t) ((packet.li_vn_mode & 0x07) >> 0) // (mode & 00 000 111) >> 0
 
+
+const char* HOST_NAME = "localhost"; // NTP server host-name.
+
 void error( char* msg )
 {
     perror( msg ); // Print the error message to stderr.
@@ -45,7 +48,6 @@ int main()
 
   int portno = 123; // NTP UDP port number.
 
-  char* host_name = "localhost"; // NTP server host-name.
 
   // Structure that defines the 48 byte NTP packet protocol.
 
@@ -100,7 +102,7 @@ int main()
   if ( sockfd < 0 )
     error( "ERROR opening socket" );
 
-  server = gethostbyname( host_name ); // Convert URL to IP.
+  server = gethostbyname( HOST_NAME ); // Convert URL to IP.
 
   if ( server == NULL )
     error( "ERROR, no such host" );
