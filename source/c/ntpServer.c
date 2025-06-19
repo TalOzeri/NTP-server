@@ -80,7 +80,7 @@ void handle_sigint(int sig) {
     exit(0);
 }
 
-typedef struct {
+typedef struct ntp_packet_t {
     uint8_t  li_vn_mode;      // Leap Indicator (2 bits), Version (3 bits), Mode (3 bits)
     uint8_t  stratum;         // Stratum level
     uint8_t  poll;            // Max interval between messages
@@ -101,7 +101,7 @@ typedef struct {
 
     uint32_t txTm_s;          // Transmit timestamp (seconds)
     uint32_t txTm_f;          // Transmit timestamp (fraction)
-} ntp_packet; // Total: 384 bits (48 bytes)
+} ntp_packet_t; // Total: 384 bits (48 bytes)
 
 void get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction) {
 
@@ -114,11 +114,11 @@ void get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction)
     *ntp_fraction = (uint32_t)((tv->tv_usec / 1e6) * (1LL << 32));
 }
 
-void create_base_ntp_response(ntp_packet *response) {
+void create_base_ntp_response(ntp_packet_t *response) {
 
     CHECK_NULL(response);
 
-    memset(response, 0, sizeof(ntp_packet));
+    memset(response, 0, sizeof(ntp_packet_t));
 
     response->li_vn_mode     = LI_VN_MODE_SERVER;
     response->stratum        = STRATUM;
@@ -129,7 +129,7 @@ void create_base_ntp_response(ntp_packet *response) {
 }
 
 // Return 1 if packet should be ignored, 0 if response should be sent
-int handle_request(ntp_packet *response, ntp_packet *request, struct sockaddr_in *client_addr) {
+int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockaddr_in *client_addr) {
 
     CHECK_NULL(response);
     CHECK_NULL(request);
@@ -182,7 +182,7 @@ int handle_request(ntp_packet *response, ntp_packet *request, struct sockaddr_in
     response->txTm_f = htonl(ntp_fraction);
 
     // Send response
-    int n = sendto(g_serverfd, (char *)response, sizeof(ntp_packet), 0,
+    int n = sendto(g_serverfd, (char *)response, sizeof(ntp_packet_t), 0,
                    (struct sockaddr *)client_addr, sizeof(*client_addr));
 
     if (n < 0) {
@@ -199,7 +199,7 @@ int main() {
     struct sockaddr_in server_addr, client_addr;
     memset(&server_addr, 0, sizeof(server_addr));
 
-    ntp_packet response;
+    ntp_packet_t response;
     create_base_ntp_response(&response);
 
     server_addr.sin_family = AF_INET;
@@ -220,21 +220,21 @@ int main() {
     if (setsockopt(g_serverfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
         error("setsockopt failed");
 
-    ntp_packet request;
+    ntp_packet_t request;
     socklen_t len = sizeof(client_addr);
 
     printf("[+] NTP server is running on port %d. Press Ctrl+C to stop.\n", NTP_PORT_NUMBER);
 
     while (1) {
-        int n = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet), 0,
+        int n = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet_t), 0,
                          (struct sockaddr *)&client_addr, &len);
 
         if (n < 0)
             error("ERROR: Reading from socket");
 
-        if (n != sizeof(ntp_packet)) {
+        if (n != sizeof(ntp_packet_t)) {
             fprintf(stderr, "Invalid NTP packet size: got %d, expected %lu\n",
-                    n, sizeof(ntp_packet));
+                    n, sizeof(ntp_packet_t));
             continue;
         }
 
