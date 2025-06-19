@@ -106,7 +106,7 @@ typedef union {
 
 // Full NTP packet structure (48 bytes total).
 // This layout matches the standard NTPv3/4 packet format used in the protocol.
-typedef struct ntp_packet_t {
+typedef struct __attribute__((packed)) ntp_packet_t {
     ntp_flags_t flags;        // First byte: Leap, Version, Mode
     uint8_t  stratum;         // Stratum level
     uint8_t  poll;            // Max interval between messages
