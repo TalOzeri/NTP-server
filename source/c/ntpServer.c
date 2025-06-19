@@ -30,6 +30,9 @@
         }                                            \
     } while (false)
 
+
+#define IGNORE_UNUSED_VARIABLES(var) (void)(x)
+
 #define NTP_PORT_NUMBER        (123)
 #define MAX_CONNECTIONS        (3)
 #define NTP_TIMESTAMP_DELTA    (2208988800ull)
@@ -64,7 +67,7 @@ void error(char *msg) {
 }
 
 void handle_sigint(int sig) {
-    (void)sig;
+    IGNORE_UNUSED_VARIABLES(sig);
     printf("\n[+] Caught SIGINT. Shutting down server...\n");
     if (g_serverfd != -1) {
         close(g_serverfd);
