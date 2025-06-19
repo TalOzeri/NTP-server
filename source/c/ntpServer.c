@@ -31,7 +31,7 @@
     } while (false)
 
 
-#define IGNORE_UNUSED_VARIABLES(var) (void)(x)
+#define IGNORE_UNUSED_VARIABLES(var) (void)(var)
 
 #define NTP_PORT_NUMBER        (123)
 #define MAX_CONNECTIONS        (3)
