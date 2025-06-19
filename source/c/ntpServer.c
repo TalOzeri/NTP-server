@@ -76,6 +76,7 @@ void handle_sigint(int sig) {
         g_serverfd = CLOSED_SOCKET;
         printf("[+] Socket closed.\n");
     }
+
     exit(0);
 }
 
