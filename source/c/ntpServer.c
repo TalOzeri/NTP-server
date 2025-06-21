@@ -19,6 +19,14 @@ void error(char *msg) {
     exit(EXIT_FAILURE);
 }
 
+/**
+ * @brief Signal handler for SIGINT (Ctrl+C).
+ *
+ * Closes the server socket if open, prints a message,
+ * and terminates the program cleanly.
+ *
+ * @param sig The signal number (ignored).
+ */
 void handle_sigint(int sig) {
     IGNORE_UNUSED_VARIABLES(sig);
     printf("\n[+] Caught SIGINT. Shutting down server...\n");
