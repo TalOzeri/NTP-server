@@ -59,7 +59,7 @@
 #define HANDLE_REQUEST_IGNORE  (1)
 #define HANDLE_REQUEST_ERROR  (-1)
 
-
+#define SOCKET_ERROR (-1)
 
 #define CLOSED_SOCKET    (-1)
 
@@ -91,7 +91,7 @@ void handle_sigint(int sig) {
         printf("[+] Socket closed.\n");
     }
 
-    exit(0);
+    exit(EXIT_SUCCESS);
 }
 
 // Union representing the first byte of an NTP packet (LI | VN | Mode).
@@ -296,7 +296,7 @@ int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockadd
     sent_bytes = sendto(g_serverfd, (char *)response, sizeof(ntp_packet_t), 0,
                    (struct sockaddr *)client_addr, sizeof(*client_addr));
 
-    if (sent_bytes < 0) {
+    if (sent_bytes == SOCKET_ERROR) {
         fprintf(stderr, "ERROR: Sending packet to the client\n");
         return HANDLE_REQUEST_ERROR;
     }
@@ -333,15 +333,15 @@ int main() {
 
     // Create UDP socket
     g_serverfd = socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
-    if (g_serverfd < 0)
+    if (g_serverfd == SOCKET_ERROR)
         error("Error creating socket");
 
     // Bind address to socket
-    if (bind(g_serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) < 0)
+    if (bind(g_serverfd, (struct sockaddr *)&server_addr, sizeof(server_addr)) == SOCKET_ERROR)
         error("Could not bind to address");
 
 
-    if (setsockopt(g_serverfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) < 0)
+    if (setsockopt(g_serverfd, SOL_SOCKET, SO_REUSEADDR, &optval, sizeof(optval)) == SOCKET_ERROR)
         error("setsockopt failed");
 
 
@@ -355,7 +355,7 @@ int main() {
         received_bytes = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet_t), 0,
                          (struct sockaddr *)&client_addr, &len);
 
-        if (received_bytes < 0) {
+        if (received_bytes == SOCKET_ERROR) {
             if (errno == EINTR) {
                 // Interrupted by signal, just retry immediately
                 continue;
@@ -385,5 +385,5 @@ int main() {
         }
     }
     
-    return 0;
+    return EXIT_SUCCESS;
 }
