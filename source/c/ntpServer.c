@@ -54,6 +54,10 @@
 #define UNKNOWN_IP_STR "UNKNOWN"
 #define NULL_TERMINATOR_OFFSET (1)
 
+#define HANDLE_REQUEST_SUCCESS (0)
+#define HANDLE_REQUEST_IGNORE  (1)
+#define HANDLE_REQUEST_ERROR  (-1)
+
 
 
 #define CLOSED_SOCKET    (-1)
@@ -200,18 +204,23 @@ void create_base_ntp_response(ntp_packet_t *response) {
 }
 
 /**
- * @brief Process an incoming NTP request and send a response.
+ * @brief Process an NTP client request and prepare a response.
  *
- * Validates the request (leap indicator, version, mode, stratum).
- * Prepares the response packet timestamps and sends it to client.
+ * Validates the incoming NTP packet and client address.
+ * If the request is valid, fills the response packet and sends it.
  *
- * @param response Pointer to the NTP response packet to send.
- * @param request Pointer to the received NTP request packet.
- * @param client_addr Pointer to client's sockaddr_in structure.
+ * Return values:
+ * - HANDLE_REQUEST_SUCCESS -> Request processed successfully, response sent.
+ * - HANDLE_REQUEST_IGNORE  -> Request ignored (invalid packet: bad mode, version, stratum, etc.).
+ * - HANDLE_REQUEST_ERROR   -> System-level failure (e.g., sendto failed).
  *
- * @return true if response sent, false if request ignored or error sending.
+ * @param response Pointer to NTP packet to fill as response.
+ * @param request Pointer to received NTP packet.
+ * @param client_addr Pointer to client address structure.
+ *
+ * @return int Status code as described above.
  */
-bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockaddr_in *client_addr) {
+int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockaddr_in *client_addr) {
 
     CHECK_NULL(response);
     CHECK_NULL(request);
@@ -227,7 +236,7 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
     uint32_t ntp_seconds, ntp_fraction;
     if (!get_time(&tv, &ntp_seconds, &ntp_fraction)) {
         fprintf(stderr, "ERROR: Could not get receive timestamp\n");
-        return false;
+        return HANDLE_REQUEST_ERROR;
     }
 
     char client_ip[INET_ADDRSTRLEN];
@@ -236,22 +245,22 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
 
     if (flags.bits.leap_indicator == UNSYNCHRONIZED_LEAP_INDICATOR) {
         fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
-        return false;
+        return HANDLE_REQUEST_IGNORE;
     }
 
     if (flags.bits.version_number < MIN_NTP_VERSION_NUM || flags.bits.version_number > MAX_NTP_VERSION_NUM) {
         fprintf(stderr, "Unsupported NTP version %d\n", flags.bits.version_number);
-        return false;
+        return HANDLE_REQUEST_IGNORE;
     }
 
     if (flags.bits.mode != NTP_CLIENT_MODE) {
         fprintf(stderr, "Packet mode is not client mode\n");
-        return false;
+        return HANDLE_REQUEST_IGNORE;
     }
 
     if (request->stratum > MAX_STRATUM) {
         fprintf(stderr, "ERROR: The stratum in the request is not supported\n");
-        return false;
+        return HANDLE_REQUEST_IGNORE;
     }
 
 
@@ -276,8 +285,8 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
 
     // Set transmit time
     if (!get_time(&tv, &ntp_seconds, &ntp_fraction)) {
-        fprintf(stderr, "ERROR: Could not get transmit timestamp\n");
-        return false;
+        perror("sendto failed");
+        return HANDLE_REQUEST_ERROR;
     }
     response->txTm_s = htonl(ntp_seconds);
     response->txTm_f = htonl(ntp_fraction);
@@ -288,10 +297,10 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
 
     if (n < 0) {
         fprintf(stderr, "ERROR: Sending packet to the client\n");
-        return false;
+        return HANDLE_REQUEST_ERROR;
     }
 
-    return true;
+    return HANDLE_REQUEST_SUCCESS;
 }
 
 
@@ -318,7 +327,7 @@ int main() {
     ntp_packet_t request;
     socklen_t len = sizeof(client_addr);
 
-    int n;
+    int n, status;
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -353,7 +362,13 @@ int main() {
             continue;
         }
 
-        handle_request(&response, &request, &client_addr);
+        status = handle_request(&response, &request, &client_addr);
+        if (status == HANDLE_REQUEST_IGNORE) {
+            continue; // Ignore bad client packet
+        } else if (status == HANDLE_REQUEST_ERROR) {
+            fprintf(stderr, "Fatal error during request handling. Exiting.\n");
+            exit(EXIT_FAILURE);
+        }
     }
     
     return 0;
