@@ -264,6 +264,15 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
     return true;
 }
 
+
+/**
+ * @brief Main entry point for the NTP server.
+ *
+ * Sets up the UDP socket, binds it to NTP port, and listens for incoming requests.
+ * For each valid request, prepares and sends an NTP response.
+ *
+ * @return 0 on clean exit (normally unreachable).
+ */
 int main() {
     signal(SIGINT, handle_sigint);
 
