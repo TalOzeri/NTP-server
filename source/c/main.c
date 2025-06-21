@@ -27,7 +27,7 @@
 #include <netdb.h>
 
 #define NTP_TIMESTAMP_DELTA 2208988800ull
-
+#define NTP_PORT_NUMBER        (123)
 
 #define LI_VN_MODE_CLIENT      (0x1b)
 
@@ -45,7 +45,7 @@ int main()
 {
   int sockfd, n; // Socket file descriptor and the n return result from writing/reading from the socket.
 
-  int portno = 123; // NTP UDP port number.
+  int portno = NTP_PORT_NUMBER; // NTP UDP port number.
 
 
   // Structure that defines the 48 byte NTP packet protocol.
