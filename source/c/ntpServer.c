@@ -353,8 +353,9 @@ int main() {
         n = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet_t), 0,
                          (struct sockaddr *)&client_addr, &len);
 
-        if (n < 0)
+        if (n < 0){
             error("ERROR: Reading from socket");
+        }
 
         if (n != sizeof(ntp_packet_t)) {
             fprintf(stderr, "Invalid NTP packet size: got %d, expected %lu\n",
