@@ -51,6 +51,10 @@
 #define USEC_IN_SEC (1000000UL)
 #define NTP_FRAC_SCALE (1LL << 32)
 
+#define UNKNOWN_IP_STR "UNKNOWN"
+#define NULL_TERMINATOR_OFFSET (1)
+
+
 
 #define CLOSED_SOCKET    (-1)
 
@@ -255,7 +259,11 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
     response->rxTm_f = htonl(ntp_fraction);
 
     // Print client info
-    inet_ntop(AF_INET, &(client_addr->sin_addr), client_ip, INET_ADDRSTRLEN);
+    if (inet_ntop(AF_INET, &(client_addr->sin_addr), client_ip, INET_ADDRSTRLEN) == NULL) {
+        perror("inet_ntop failed");
+        strncpy(client_ip, UNKNOWN_IP_STR, sizeof(client_ip));
+        client_ip[sizeof(client_ip) - NULL_TERMINATOR_OFFSET] = '\0';
+    }
     printf("Request from %s\n", client_ip);
 
     // Copy client timestamps
