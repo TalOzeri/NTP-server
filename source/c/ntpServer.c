@@ -42,6 +42,10 @@
 #define DEFAULT_POLL_INTERVAL  (6)
 #define PRECISION_MS           (-6)
 #define MAX_STRATUM            (15)
+#define UNSYNCHRONIZED_LEAP_INDICATOR         (3)
+#define MIN_NTP_VERSION_NUM     (1)
+#define MAX_NTP_VERSION_NUM     (4)
+#define NTP_CLIENT_MODE         (3)
 
 
 
@@ -198,17 +202,17 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
     memcpy(&flags, &request->flags, sizeof(ntp_flags_t));
 
 
-    if (flags.bits.leap_indicator == 3) {
+    if (flags.bits.leap_indicator == UNSYNCHRONIZED_LEAP_INDICATOR) {
         fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
         return false;
     }
 
-    if (flags.bits.version_number < 1 || flags.bits.version_number > 4) {
+    if (flags.bits.version_number < MIN_NTP_VERSION_NUM || flags.bits.version_number > MAX_NTP_VERSION_NUM) {
         fprintf(stderr, "Unsupported NTP version %d\n", flags.bits.version_number);
         return false;
     }
 
-    if (flags.bits.mode != 3) {
+    if (flags.bits.mode != NTP_CLIENT_MODE) {
         fprintf(stderr, "Packet mode is not client mode\n");
         return false;
     }
