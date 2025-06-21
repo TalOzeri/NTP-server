@@ -129,6 +129,17 @@ typedef struct __attribute__((packed)) ntp_packet_t {
     uint32_t txTm_f;          // Transmit timestamp (fraction)
 } ntp_packet_t; // Total: 384 bits (48 bytes)
 
+
+/**
+ * @brief Get the current system time and convert to NTP format.
+ *
+ * Retrieves system time via gettimeofday, calculates NTP seconds
+ * (with delta since 1900) and NTP fractional seconds.
+ *
+ * @param tv Pointer to struct timeval to store system time.
+ * @param ntp_seconds Pointer to store NTP seconds value.
+ * @param ntp_fraction Pointer to store NTP fraction value.
+ */
 void get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction) {
 
     CHECK_NULL(tv);
