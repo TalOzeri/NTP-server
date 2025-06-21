@@ -151,6 +151,16 @@ void get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction)
     *ntp_fraction = (uint32_t)((tv->tv_usec / 1e6) * (1LL << 32));
 }
 
+
+
+/**
+ * @brief Initialize an NTP response packet with base server values.
+ *
+ * Fills the provided NTP packet with standard values for a server response,
+ * such as flags, stratum, poll interval, precision, and fixed root delay/dispersion.
+ *
+ * @param response Pointer to ntp_packet_t structure to fill.
+ */
 void create_base_ntp_response(ntp_packet_t *response) {
 
     CHECK_NULL(response);
