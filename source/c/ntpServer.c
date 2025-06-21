@@ -176,7 +176,7 @@ void create_base_ntp_response(ntp_packet_t *response) {
 }
 
 // Return 1 if packet should be ignored, 0 if response should be sent
-int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockaddr_in *client_addr) {
+bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockaddr_in *client_addr) {
 
     CHECK_NULL(response);
     CHECK_NULL(request);
@@ -189,22 +189,22 @@ int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockadd
 
     if (flags.bits.leap_indicator == 3) {
         fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
-        return 1;
+        return false;
     }
 
     if (flags.bits.version_number < 1 || flags.bits.version_number > 4) {
         fprintf(stderr, "Unsupported NTP version %d\n", flags.bits.version_number);
-        return 1;
+        return false;
     }
 
     if (flags.bits.mode != 3) {
         fprintf(stderr, "Packet mode is not client mode\n");
-        return 1;
+        return false;
     }
 
     if (request->stratum > MAX_STRATUM) {
         fprintf(stderr, "ERROR: The stratum in the request is not supported\n");
-        return 1;
+        return false;
     }
 
     // Timestamp receive time
@@ -239,10 +239,10 @@ int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockadd
 
     if (n < 0) {
         fprintf(stderr, "ERROR: Sending packet to the client\n");
-        return 1;
+        return false;
     }
 
-    return 0;
+    return true;
 }
 
 int main() {
@@ -290,8 +290,7 @@ int main() {
             continue;
         }
 
-        if (handle_request(&response, &request, &client_addr))
-            continue;
+        handle_request(&response, &request, &client_addr);
     }
     
     return 0;
