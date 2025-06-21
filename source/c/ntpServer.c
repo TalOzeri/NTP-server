@@ -46,6 +46,7 @@
 #define MIN_NTP_VERSION_NUM     (1)
 #define MAX_NTP_VERSION_NUM     (4)
 #define NTP_CLIENT_MODE         (3)
+#define FAILURE                 (-1)
 
 
 
@@ -135,24 +136,34 @@ typedef struct __attribute__((packed)) ntp_packet_t {
 
 
 /**
- * @brief Get the current system time and convert to NTP format.
+ * @brief Get the current system time and convert it to NTP format.
  *
- * Retrieves system time via gettimeofday, calculates NTP seconds
- * (with delta since 1900) and NTP fractional seconds.
+ * This function retrieves the current system time using gettimeofday.
+ * It converts the time to NTP format: seconds since 1900 (NTP epoch) and
+ * fractional seconds represented as a 32-bit fixed-point value.
  *
- * @param tv Pointer to struct timeval to store system time.
- * @param ntp_seconds Pointer to store NTP seconds value.
- * @param ntp_fraction Pointer to store NTP fraction value.
+ * If gettimeofday fails, an error message is printed and the function
+ * returns false.
+ *
+ * @param tv Pointer to a timeval structure where the system time will be stored.
+ * @param ntp_seconds Pointer to a uint32_t where the NTP seconds will be stored.
+ * @param ntp_fraction Pointer to a uint32_t where the NTP fractional part will be stored.
+ *
+ * @return true if the time was retrieved and converted successfully, false if an error occurred.
  */
-void get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction) {
-
+bool get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction) {
     CHECK_NULL(tv);
     CHECK_NULL(ntp_seconds);
     CHECK_NULL(ntp_fraction);
 
-    gettimeofday(tv, NULL);
+    if (gettimeofday(tv, NULL) == FAILURE) {
+        perror("gettimeofday failed");
+        return false;
+    }
+
     *ntp_seconds = tv->tv_sec + NTP_TIMESTAMP_DELTA;
     *ntp_fraction = (uint32_t)((tv->tv_usec / 1e6) * (1LL << 32));
+    return true;
 }
 
 
@@ -205,7 +216,10 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
     // Timestamp receive time
     struct timeval tv;
     uint32_t ntp_seconds, ntp_fraction;
-    get_time(&tv, &ntp_seconds, &ntp_fraction);
+    if (!get_time(&tv, &ntp_seconds, &ntp_fraction)) {
+        fprintf(stderr, "ERROR: Could not get receive timestamp\n");
+        return false;
+    }
 
     char client_ip[INET_ADDRSTRLEN];
 
@@ -248,7 +262,10 @@ bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockad
     response->refTm_f = response->rxTm_f;
 
     // Set transmit time
-    get_time(&tv, &ntp_seconds, &ntp_fraction);
+    if (!get_time(&tv, &ntp_seconds, &ntp_fraction)) {
+        fprintf(stderr, "ERROR: Could not get transmit timestamp\n");
+        return false;
+    }
     response->txTm_s = htonl(ntp_seconds);
     response->txTm_f = htonl(ntp_fraction);
 
