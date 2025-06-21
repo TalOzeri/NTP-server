@@ -318,14 +318,11 @@ int main() {
     struct sockaddr_in server_addr, client_addr;
     memset(&server_addr, 0, sizeof(server_addr));
 
-    ntp_packet_t response;
-    create_base_ntp_response(&response);
 
     // Reuse address
     int optval = 1;
 
-    ntp_packet_t request;
-    socklen_t len = sizeof(client_addr);
+        socklen_t len = sizeof(client_addr);
 
     int n, status;
 
@@ -350,6 +347,10 @@ int main() {
     printf("[+] NTP server is running on port %d. Press Ctrl+C to stop.\n", NTP_PORT_NUMBER);
 
     while (1) {
+        ntp_packet_t request;
+        ntp_packet_t response;
+        create_base_ntp_response(&response);
+
         n = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet_t), 0,
                          (struct sockaddr *)&client_addr, &len);
 
