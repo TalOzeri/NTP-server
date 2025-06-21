@@ -242,7 +242,7 @@ int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockadd
 
     char client_ip[INET_ADDRSTRLEN];
 
-    int n;
+    int sent_bytes;
 
     if (flags.bits.leap_indicator == UNSYNCHRONIZED_LEAP_INDICATOR) {
         fprintf(stderr, "Leap Indicator unsynchronized, ignoring packet\n");
@@ -293,10 +293,10 @@ int handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockadd
     response->txTm_f = htonl(ntp_fraction);
 
     // Send response
-    n = sendto(g_serverfd, (char *)response, sizeof(ntp_packet_t), 0,
+    sent_bytes = sendto(g_serverfd, (char *)response, sizeof(ntp_packet_t), 0,
                    (struct sockaddr *)client_addr, sizeof(*client_addr));
 
-    if (n < 0) {
+    if (sent_bytes < 0) {
         fprintf(stderr, "ERROR: Sending packet to the client\n");
         return HANDLE_REQUEST_ERROR;
     }
@@ -325,7 +325,7 @@ int main() {
 
         socklen_t len = sizeof(client_addr);
 
-    int n, status;
+    int received_bytes, status;
 
     server_addr.sin_family = AF_INET;
     server_addr.sin_addr.s_addr = INADDR_ANY;
@@ -352,10 +352,10 @@ int main() {
         ntp_packet_t response;
         create_base_ntp_response(&response);
 
-        n = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet_t), 0,
+        received_bytes = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet_t), 0,
                          (struct sockaddr *)&client_addr, &len);
 
-        if (n < 0) {
+        if (received_bytes < 0) {
             if (errno == EINTR) {
                 // Interrupted by signal, just retry immediately
                 continue;
@@ -370,9 +370,9 @@ int main() {
             }
         }
 
-        if (n != sizeof(ntp_packet_t)) {
+        if (received_bytes != sizeof(ntp_packet_t)) {
             fprintf(stderr, "Invalid NTP packet size: got %d, expected %lu\n",
-                    n, sizeof(ntp_packet_t));
+                    received_bytes, sizeof(ntp_packet_t));
             continue;
         }
 
