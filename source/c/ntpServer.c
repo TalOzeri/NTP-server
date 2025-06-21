@@ -346,7 +346,7 @@ int main() {
 
     printf("[+] NTP server is running on port %d. Press Ctrl+C to stop.\n", NTP_PORT_NUMBER);
 
-    while (1) {
+    while (true) {
         ntp_packet_t request;
         ntp_packet_t response;
         create_base_ntp_response(&response);
