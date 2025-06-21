@@ -11,6 +11,7 @@
 #include <arpa/inet.h>
 #include <signal.h>
 #include <stdbool.h>
+#include <errno.h>
 
 /*
  * CHECK_NULL(ptr)
@@ -354,8 +355,19 @@ int main() {
         n = recvfrom(g_serverfd, (char *)&request, sizeof(ntp_packet_t), 0,
                          (struct sockaddr *)&client_addr, &len);
 
-        if (n < 0){
-            error("ERROR: Reading from socket");
+        if (n < 0) {
+            if (errno == EINTR) {
+                // Interrupted by signal, just retry immediately
+                continue;
+            } else if (errno == EAGAIN || errno == EWOULDBLOCK) {
+                // No data available right now, could optionally sleep or just continue
+                fprintf(stderr, "Warning: No data available (EAGAIN/EWOULDBLOCK), retrying...\n");
+                continue;
+            } else {
+                // Fatal or unexpected error
+                perror("recvfrom failed");
+                exit(EXIT_FAILURE);
+            }
         }
 
         if (n != sizeof(ntp_packet_t)) {
