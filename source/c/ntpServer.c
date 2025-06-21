@@ -48,6 +48,8 @@
 #define NTP_CLIENT_MODE         (3)
 #define FAILURE                 (-1)
 
+#define USEC_IN_SEC (1000000UL)
+#define NTP_FRAC_SCALE (1LL << 32)
 
 
 #define CLOSED_SOCKET    (-1)
@@ -134,23 +136,23 @@ typedef struct __attribute__((packed)) ntp_packet_t {
     uint32_t txTm_f;          // Transmit timestamp (fraction)
 } ntp_packet_t; // Total: 384 bits (48 bytes)
 
-
 /**
- * @brief Get the current system time and convert it to NTP format.
- *
- * This function retrieves the current system time using gettimeofday.
- * It converts the time to NTP format: seconds since 1900 (NTP epoch) and
- * fractional seconds represented as a 32-bit fixed-point value.
- *
- * If gettimeofday fails, an error message is printed and the function
- * returns false.
- *
- * @param tv Pointer to a timeval structure where the system time will be stored.
- * @param ntp_seconds Pointer to a uint32_t where the NTP seconds will be stored.
- * @param ntp_fraction Pointer to a uint32_t where the NTP fractional part will be stored.
- *
- * @return true if the time was retrieved and converted successfully, false if an error occurred.
- */
+* @brief Get the current system time and convert it to NTP format.
+*
+* This function retrieves the current system time using gettimeofday().
+* It converts the time to NTP format:
+* - NTP seconds: seconds since 1900 (NTP epoch)
+* - NTP fraction: fractional part of the second, as 32-bit fixed point
+*
+* The NTP fraction is calculated by converting microseconds to a
+* 32-bit fixed-point fraction: (microseconds / 1,000,000) * 2^32.
+*
+* @param tv Pointer to timeval to store the current system time.
+* @param ntp_seconds Pointer to store the NTP seconds.
+* @param ntp_fraction Pointer to store the NTP fractional seconds.
+*
+* @return true on success, false on failure.
+*/
 bool get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction) {
     CHECK_NULL(tv);
     CHECK_NULL(ntp_seconds);
@@ -162,7 +164,10 @@ bool get_time(struct timeval *tv, uint32_t *ntp_seconds, uint32_t *ntp_fraction)
     }
 
     *ntp_seconds = tv->tv_sec + NTP_TIMESTAMP_DELTA;
-    *ntp_fraction = (uint32_t)((tv->tv_usec / 1e6) * (1LL << 32));
+
+    double fraction = (double)(tv->tv_usec) / USEC_IN_SEC;
+    *ntp_fraction = (uint32_t)(fraction * NTP_FRAC_SCALE);
+
     return true;
 }
 
