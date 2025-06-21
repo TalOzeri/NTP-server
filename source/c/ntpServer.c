@@ -175,7 +175,18 @@ void create_base_ntp_response(ntp_packet_t *response) {
     response->rootDispersion = htonl(1 << 16); // 1.0 in NTP short format
 }
 
-// Return 1 if packet should be ignored, 0 if response should be sent
+/**
+ * @brief Process an incoming NTP request and send a response.
+ *
+ * Validates the request (leap indicator, version, mode, stratum).
+ * Prepares the response packet timestamps and sends it to client.
+ *
+ * @param response Pointer to the NTP response packet to send.
+ * @param request Pointer to the received NTP request packet.
+ * @param client_addr Pointer to client's sockaddr_in structure.
+ *
+ * @return true if response sent, false if request ignored or error sending.
+ */
 bool handle_request(ntp_packet_t *response, ntp_packet_t *request, struct sockaddr_in *client_addr) {
 
     CHECK_NULL(response);
